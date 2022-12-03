@@ -41,8 +41,12 @@ class UserRepository extends BaseRepository
         $this->logger->pushHandler(new FirePHPHandler());
     }
 
-    public function createOrUpdate($id = null, $request)
-    { 
+    /**
+     * @param null $id
+     * @param $request
+     */
+    public function CreateORUpdateUser($id = null, $request)
+    {
         $model = is_null($id) ? new User : User::findOrFail($id);
         $model->user_type = $request['role'];
         $model->name = $request['name'];
@@ -56,16 +60,28 @@ class UserRepository extends BaseRepository
 
         if (!$id || $id && $request['password']) $model->password = bcrypt($request['password']);
         $model->detachAllRoles();
-        $model->save();
         $model->attachRole($request['role']);
+        if ($model->save()){
+            return $model;
+        }else{
+            return false;
+        }
+    }
+
+    public function createOrUpdate($id = null, $request)
+    {
+        $responseFromCreateOrUpdateUserMethod = $this->CreateORUpdateUser($id = null, $request);
+        if($responseFromCreateOrUpdateUserMethod != false){
+            $model = $responseFromCreateOrUpdateUserMethod;
+        }else{
+            return false;
+        }
         $data = array();
 
         if ($request['role'] == env('CUSTOMER_ROLE_ID')) {
 
-            if($request['consumer_type'] == 'paid')
-            {
-                if($request['company_id'] == '')
-                {
+            if ($request['consumer_type'] == 'paid') {
+                if ($request['company_id'] == '') {
                     $type = Type::where('code', 'paid')->first();
                     $company = Company::create(['name' => $request['name'], 'type_id' => $type->id, 'additional_info' => 'Created automatically for user ' . $model->id]);
                     $department = Department::create(['name' => $request['name'], 'company_id' => $company->id, 'additional_info' => 'Created automatically for user ' . $model->id]);
@@ -231,5 +247,5 @@ class UserRepository extends BaseRepository
     {
         return User::where('user_type', 2)->get();
     }
-    
+
 }
